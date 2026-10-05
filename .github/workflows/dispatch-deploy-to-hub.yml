@@ -1,0 +1,42 @@
+name: Deployment am Hub-Repo anstossen
+
+# Ersetzt (nach erfolgreichem Test, siehe Architekturplan fuer das
+# zentrale Guard/CI-CD-Hub-Repo, Schritt 7) das bisherige, vendorte
+# dsp-deploy.yml - ermittelt NICHT mehr selbst, sondern meldet den Push
+# nur an das zentrale Hub-Repo (PAGNOS/pagnos-dsp-git-hub), das Delta/
+# Reihenfolge/Deployment-Tag-Verschiebung nativ fuer alle angebundenen
+# Kunden-Repos durchfuehrt (siehe dort .github/workflows/deploy.yml).
+# Laeuft bis zur vollstaendigen Umstellung bewusst PARALLEL zu
+# dsp-deploy.yml.
+#
+# "HUB_DISPATCH_TOKEN": dasselbe fein granulierte PAT wie fuer den
+# Guard-Check-Dispatch (siehe dispatch-to-hub.yml) - ausschliesslich
+# Schreibrecht auf das Hub-Repo selbst.
+#
+# Der manuelle "reset"-Checkbox-Lauf (initiale Beladung) ist mit dem Umzug
+# eine bewusste Admin-Aktion direkt im Hub (workflow_dispatch dort) statt
+# hier im Kunden-Repo ausloesbar.
+
+on:
+  push:
+    branches:
+      - test
+      - main
+    paths:
+      - "**/spaces/**"
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deployment am Hub-Repo anstossen
+        env:
+          GH_TOKEN: ${{ secrets.HUB_DISPATCH_TOKEN }}
+        run: |
+          REPO_NAME=$(basename "${{ github.repository }}")
+          ENV_NAME="${{ github.repository_owner }}__${REPO_NAME}"
+          gh api repos/PAGNOS/pagnos-dsp-git-hub/dispatches \
+            -f event_type="deploy" \
+            -F "client_payload[env_name]=$ENV_NAME" \
+            -F "client_payload[branch]=${{ github.ref_name }}" \
+            -F "client_payload[sha]=${{ github.sha }}"

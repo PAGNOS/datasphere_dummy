@@ -1,0 +1,47 @@
+name: Dispatch an zentrales Guard/CI-CD-Hub-Repo
+
+# Ersetzt (nach erfolgreichem Test, siehe Architekturplan fuer das
+# zentrale Guard/CI-CD-Hub-Repo, Schritt 7) das bisherige, vendorte
+# git-guard.yml - prueft NICHT mehr selbst, sondern meldet Push/PR nur an
+# das zentrale Hub-Repo (PAGNOS/pagnos-dsp-git-hub), das die eigentliche
+# Pruefung nativ fuer alle angebundenen Kunden-Repos durchfuehrt (siehe
+# dort .github/workflows/guard-check.yml). Laeuft bis zur vollstaendigen
+# Umstellung bewusst PARALLEL zu git-guard.yml, damit der bestehende
+# Schutz waehrend der Testphase nicht wegfaellt.
+#
+# "HUB_DISPATCH_TOKEN": ein fein granuliertes PAT mit AUSSCHLIESSLICH
+# Schreibrecht auf das Hub-Repo selbst (Contents: Read & write) - kann
+# nichts in diesem oder einem anderen Kunden-Repo bewirken, selbst wenn es
+# geleakt wird. Bewusst NICHT die GitHub App des Hubs (deren Private Key
+# bleibt ausschliesslich im Hub-Repo, siehe dortiges guard-check.yml).
+
+on:
+  push:
+    branches:
+      - dev
+      - test
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard-Check am Hub-Repo anstossen
+        env:
+          GH_TOKEN: ${{ secrets.HUB_DISPATCH_TOKEN }}
+          GUARD_BEFORE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          GUARD_AFTER_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          REPO_NAME=$(basename "${{ github.repository }}")
+          ENV_NAME="${{ github.repository_owner }}__${REPO_NAME}"
+          gh api repos/PAGNOS/pagnos-dsp-git-hub/dispatches \
+            -f event_type="guard-check" \
+            -F "client_payload[repo]=${{ github.repository }}" \
+            -F "client_payload[owner]=${{ github.repository_owner }}" \
+            -F "client_payload[repo_name]=$REPO_NAME" \
+            -F "client_payload[env_name]=$ENV_NAME" \
+            -F "client_payload[event_name]=${{ github.event_name }}" \
+            -F "client_payload[before]=$GUARD_BEFORE_SHA" \
+            -F "client_payload[after]=$GUARD_AFTER_SHA"
