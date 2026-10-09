@@ -14,6 +14,17 @@ name: Dispatch an zentrales Guard/CI-CD-Hub-Repo
 # nichts in diesem oder einem anderen Kunden-Repo bewirken, selbst wenn es
 # geleakt wird. Bewusst NICHT die GitHub App des Hubs (deren Private Key
 # bleibt ausschliesslich im Hub-Repo, siehe dortiges guard-check.yml).
+#
+# "client_payload[actor]": GitHub-authentifizierte Identitaet des
+# Push/PR-Events (NICHT die Commit-Autor-E-Mail - die ist frei faelschbar).
+# Dient dem Hub dazu, die Space-Berechtigung GEGEN DIESE Person statt
+# gegen eine geteilte, tenant-weite Liste zu pruefen (siehe
+# project_per_developer_authorization_concept, Memory). BEKANNTE,
+# BEWUSST VORERST OFFENE EINSCHRAENKUNG: bei einem Merge ueber den
+# "Merge pull request"-Button ist "actor" die MERGENDE Person, nicht
+# zwingend die inhaltlich verantwortliche - die vollstaendige Loesung
+# (Pruefung pro signiertem Commit statt pro Event) ist als Baustein 3 im
+# selben Memory-Eintrag dokumentiert, aber noch nicht umgesetzt.
 
 on:
   push:
@@ -44,4 +55,5 @@ jobs:
             -F "client_payload[env_name]=$ENV_NAME" \
             -F "client_payload[event_name]=${{ github.event_name }}" \
             -F "client_payload[before]=$GUARD_BEFORE_SHA" \
-            -F "client_payload[after]=$GUARD_AFTER_SHA"
+            -F "client_payload[after]=$GUARD_AFTER_SHA" \
+            -F "client_payload[actor]=${{ github.actor }}"
